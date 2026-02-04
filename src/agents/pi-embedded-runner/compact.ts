@@ -62,7 +62,7 @@ import {
 import {
   pruneHistoryForContextShare,
   resolveContextWindowTokens,
-} from "../../compaction.js";
+} from "../compaction.js";
 import { getDmHistoryLimitFromSessionKey, limitHistoryTurns } from "./history.js";
 import { resolveGlobalLane, resolveSessionLane } from "./lanes.js";
 import { log } from "./logger.js";
