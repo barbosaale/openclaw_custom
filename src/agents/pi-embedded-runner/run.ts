@@ -398,6 +398,11 @@ export async function runEmbeddedPiAgent(
                   bashElevated: params.bashElevated,
                   extraSystemPrompt: params.extraSystemPrompt,
                   ownerNumbers: params.ownerNumbers,
+                  customTokenLimit:
+                    normalizeProviderId(provider) === "google-antigravity" ||
+                    normalizeProviderId(provider) === "google"
+                      ? 1_000_000
+                      : undefined,
                 });
                 if (compactResult.compacted) {
                   log.info(`auto-compaction succeeded for ${provider}/${modelId}; retrying prompt`);

@@ -48,6 +48,7 @@ export function buildEmbeddedSystemPrompt(params: {
   userTimeFormat?: ResolvedTimeFormat;
   contextFiles?: EmbeddedContextFile[];
   memoryCitationsMode?: MemoryCitationsMode;
+  excludeDynamicContext?: boolean;
 }): string {
   return buildAgentSystemPrompt({
     workspaceDir: params.workspaceDir,
@@ -74,6 +75,7 @@ export function buildEmbeddedSystemPrompt(params: {
     userTimeFormat: params.userTimeFormat,
     contextFiles: params.contextFiles,
     memoryCitationsMode: params.memoryCitationsMode,
+    excludeDynamicContext: params.excludeDynamicContext,
   });
 }
 
@@ -96,4 +98,39 @@ export function applySystemPromptOverrideToSession(
   };
   mutableSession._baseSystemPrompt = prompt;
   mutableSession._rebuildSystemPrompt = () => prompt;
+}
+
+export function getStaticSystemPrompt(
+  params: Parameters<typeof buildEmbeddedSystemPrompt>[0],
+): string {
+  return buildEmbeddedSystemPrompt({ ...params, excludeDynamicContext: true });
+}
+
+export function getDynamicContext(params: Parameters<typeof buildEmbeddedSystemPrompt>[0]): string {
+  // Map EmbeddedSandboxInfo to core sandboxInfo
+  const sandboxInfo = params.sandboxInfo
+    ? {
+        enabled: params.sandboxInfo.enabled,
+        workspaceDir: params.sandboxInfo.workspaceDir,
+        workspaceAccess: params.sandboxInfo.workspaceAccess,
+        agentWorkspaceMount: params.sandboxInfo.agentWorkspaceMount,
+        browserBridgeUrl: params.sandboxInfo.browserBridgeUrl,
+        browserNoVncUrl: params.sandboxInfo.browserNoVncUrl,
+        hostBrowserAllowed: params.sandboxInfo.hostBrowserAllowed,
+        elevated: params.sandboxInfo.elevated,
+      }
+    : undefined;
+
+  const { buildSystemContextMessage } = require("../system-prompt.js");
+  return buildSystemContextMessage({
+    workspaceDir: params.workspaceDir,
+    workspaceNotes: params.workspaceNotes,
+    sandboxInfo,
+    ownerNumbers: params.ownerNumbers,
+    userTimezone: params.userTimezone,
+    runtimeInfo: params.runtimeInfo,
+    defaultThinkLevel: params.defaultThinkLevel,
+    extraSystemPrompt: params.extraSystemPrompt,
+    promptMode: params.promptMode,
+  });
 }

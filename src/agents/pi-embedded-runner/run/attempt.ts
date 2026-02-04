@@ -17,7 +17,7 @@ import { resolveTelegramReactionLevel } from "../../../telegram/reaction-level.j
 import { buildTtsSystemPromptHint } from "../../../tts/tts.js";
 import { resolveUserPath } from "../../../utils.js";
 import { normalizeMessageChannel } from "../../../utils/message-channel.js";
-import { isReasoningTagProvider } from "../../../utils/provider-utils.js";
+import { isReasoningTagProvider, normalizeProviderId } from "../../../utils/provider-utils.js";
 import { resolveOpenClawAgentDir } from "../../agent-paths.js";
 import { resolveSessionAgentIds } from "../../agent-scope.js";
 import { createAnthropicPayloadLogger } from "../../anthropic-payload-log.js";
@@ -345,7 +345,7 @@ export async function runEmbeddedAttempt(
     });
     const ttsHint = params.config ? buildTtsSystemPromptHint(params.config) : undefined;
 
-    const appendPrompt = buildEmbeddedSystemPrompt({
+    const appendPromptParams = {
       workspaceDir: effectiveWorkspace,
       defaultThinkLevel: params.thinkLevel,
       reasoningLevel: params.reasoningLevel ?? "off",
@@ -371,7 +371,9 @@ export async function runEmbeddedAttempt(
       userTimeFormat,
       contextFiles,
       memoryCitationsMode: params.config?.memory?.citations,
-    });
+    };
+
+    const appendPrompt = buildEmbeddedSystemPrompt(appendPromptParams);
     const systemPromptReport = buildSystemPromptReport({
       source: "run",
       generatedAt: Date.now(),
@@ -484,11 +486,42 @@ export async function runEmbeddedAttempt(
         sessionManager,
         settingsManager,
       }));
-      applySystemPromptOverrideToSession(session, systemPromptText);
+
+      // Ensure session exists immediately
       if (!session) {
         throw new Error("Embedded agent session missing");
       }
       const activeSession = session;
+
+      let systemPromptText: string;
+      const isGoogle =
+        normalizeProviderId(params.provider) === "google" ||
+        normalizeProviderId(params.provider) === "google-antigravity";
+
+      if (isGoogle) {
+        // For Google/Antigravity: Use static system instructions and inject dynamic context as a message
+        const { getStaticSystemPrompt, getDynamicContext } = require("../system-prompt.js");
+        
+        // Fix PromptMode type compatibility by casting appendPromptParams
+        // (The structure is compatible, just strict type checking on string vs enum-like union)
+        const staticPrompt = getStaticSystemPrompt(appendPromptParams as any);
+
+        systemPromptText = createSystemPromptOverride(staticPrompt)();
+
+        const dynamicContext = getDynamicContext(appendPromptParams as any);
+        const dynamicContextMessage: AgentMessage = {
+          role: "user",
+          content: [{ type: "text", text: dynamicContext }],
+          timestamp: Date.now(), // Add required timestamp
+        };
+        
+        // Inject as the VERY first message in the session history
+        activeSession.agent.replaceMessages([dynamicContextMessage, ...activeSession.messages]);
+      } else {
+         systemPromptText = systemPromptOverride();
+      }
+
+      applySystemPromptOverrideToSession(activeSession, systemPromptText);
       const cacheTrace = createCacheTrace({
         cfg: params.config,
         env: process.env,

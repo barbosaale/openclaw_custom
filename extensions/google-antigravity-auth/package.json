@@ -3,6 +3,9 @@
   "version": "2026.2.2",
   "description": "OpenClaw Google Antigravity OAuth provider plugin",
   "type": "module",
+  "dependencies": {
+    "@google/generative-ai": "^0.12.0"
+  },
   "devDependencies": {
     "openclaw": "workspace:*"
   },

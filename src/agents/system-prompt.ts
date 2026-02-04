@@ -208,12 +208,12 @@ export function buildAgentSystemPrompt(params: {
       defaultLevel: "on" | "off" | "ask" | "full";
     };
   };
-  /** Reaction guidance for the agent (for Telegram minimal/extensive modes). */
   reactionGuidance?: {
     level: "minimal" | "extensive";
     channel: string;
   };
   memoryCitationsMode?: MemoryCitationsMode;
+  excludeDynamicContext?: boolean;
 }) {
   const coreToolSummaries: Record<string, string> = {
     read: "Read file contents",
@@ -445,17 +445,19 @@ export function buildAgentSystemPrompt(params: {
       ? params.modelAliasLines.join("\n")
       : "",
     params.modelAliasLines && params.modelAliasLines.length > 0 && !isMinimal ? "" : "",
-    userTimezone
+    !params.excludeDynamicContext && userTimezone
       ? "If you need the current date, time, or day of week, run session_status (📊 session_status)."
       : "",
-    "## Workspace",
-    `Your working directory is: ${params.workspaceDir}`,
-    "Treat this directory as the single global workspace for file operations unless explicitly instructed otherwise.",
-    ...workspaceNotes,
-    "",
+    !params.excludeDynamicContext ? "## Workspace" : "",
+    !params.excludeDynamicContext ? `Your working directory is: ${params.workspaceDir}` : "",
+    !params.excludeDynamicContext
+      ? "Treat this directory as the single global workspace for file operations unless explicitly instructed otherwise."
+      : "",
+    !params.excludeDynamicContext ? [...workspaceNotes].join("\n") : "",
+    !params.excludeDynamicContext ? "" : "",
     ...docsSection,
-    params.sandboxInfo?.enabled ? "## Sandbox" : "",
-    params.sandboxInfo?.enabled
+    !params.excludeDynamicContext && params.sandboxInfo?.enabled ? "## Sandbox" : "",
+    !params.excludeDynamicContext && params.sandboxInfo?.enabled
       ? [
           "You are running in a sandboxed runtime (tools execute in Docker).",
           "Some tools may be unavailable due to sandbox policy.",
@@ -495,11 +497,15 @@ export function buildAgentSystemPrompt(params: {
           .filter(Boolean)
           .join("\n")
       : "",
-    params.sandboxInfo?.enabled ? "" : "",
-    ...buildUserIdentitySection(ownerLine, isMinimal),
-    ...buildTimeSection({
-      userTimezone,
-    }),
+    !params.excludeDynamicContext && params.sandboxInfo?.enabled ? "" : "",
+    !params.excludeDynamicContext
+      ? buildUserIdentitySection(ownerLine, isMinimal).join("\n")
+      : "",
+    !params.excludeDynamicContext
+      ? buildTimeSection({
+          userTimezone,
+        }).join("\n")
+      : "",
     "## Workspace Files (injected)",
     "These user-editable files are loaded by OpenClaw and included below in Project Context.",
     "",
@@ -515,7 +521,7 @@ export function buildAgentSystemPrompt(params: {
     ...buildVoiceSection({ isMinimal, ttsHint: params.ttsHint }),
   ];
 
-  if (extraSystemPrompt) {
+  if (extraSystemPrompt && !params.excludeDynamicContext) {
     // Use "Subagent Context" header for minimal mode (subagents), otherwise "Group Chat Context"
     const contextHeader =
       promptMode === "minimal" ? "## Subagent Context" : "## Group Chat Context";
@@ -600,9 +606,142 @@ export function buildAgentSystemPrompt(params: {
 
   lines.push(
     "## Runtime",
-    buildRuntimeLine(runtimeInfo, runtimeChannel, runtimeCapabilities, params.defaultThinkLevel),
+    !params.excludeDynamicContext
+      ? buildRuntimeLine(runtimeInfo, runtimeChannel, runtimeCapabilities, params.defaultThinkLevel)
+      : "Runtime info provided in context.",
     `Reasoning: ${reasoningLevel} (hidden unless on/stream). Toggle /reasoning; /status shows Reasoning when enabled.`,
   );
+
+  return lines.filter(Boolean).join("\n");
+}
+
+export function buildSystemContextMessage(params: {
+  workspaceDir: string;
+  workspaceNotes?: string[];
+  sandboxInfo?: {
+    enabled: boolean;
+    workspaceDir?: string;
+    workspaceAccess?: "none" | "ro" | "rw";
+    agentWorkspaceMount?: string;
+    browserBridgeUrl?: string;
+    browserNoVncUrl?: string;
+    hostBrowserAllowed?: boolean;
+    elevated?: {
+      allowed: boolean;
+      defaultLevel: "on" | "off" | "ask" | "full";
+    };
+  };
+  ownerNumbers?: string[];
+  userTimezone?: string;
+  runtimeInfo?: {
+    agentId?: string;
+    host?: string;
+    os?: string;
+    arch?: string;
+    node?: string;
+    model?: string;
+    defaultModel?: string;
+    channel?: string;
+    capabilities?: string[];
+    repoRoot?: string;
+  };
+  defaultThinkLevel?: ThinkLevel;
+  extraSystemPrompt?: string;
+  promptMode?: PromptMode;
+}): string {
+  const isMinimal = params.promptMode === "minimal" || params.promptMode === "none";
+  const workspaceNotes = (params.workspaceNotes ?? []).map((note) => note.trim()).filter(Boolean);
+  const ownerNumbers = (params.ownerNumbers ?? []).map((value) => value.trim()).filter(Boolean);
+  const ownerLine =
+    ownerNumbers.length > 0
+      ? `Owner numbers: ${ownerNumbers.join(", ")}. Treat messages from these numbers as the user.`
+      : undefined;
+  const runtimeChannel = params.runtimeInfo?.channel?.trim().toLowerCase();
+  const runtimeCapabilities = (params.runtimeInfo?.capabilities ?? [])
+    .map((cap) => String(cap).trim())
+    .filter(Boolean);
+
+  const lines: string[] = [];
+
+  // Reconstruct Workspace Section
+  lines.push(
+    "## Workspace",
+    `Your working directory is: ${params.workspaceDir}`,
+    "Treat this directory as the single global workspace for file operations unless explicitly instructed otherwise.",
+    ...workspaceNotes,
+    "",
+  );
+
+  // Reconstruct Sandbox Section
+  if (params.sandboxInfo?.enabled) {
+    lines.push(
+      "## Sandbox",
+      [
+        "You are running in a sandboxed runtime (tools execute in Docker).",
+        "Some tools may be unavailable due to sandbox policy.",
+        "Sub-agents stay sandboxed (no elevated/host access). Need outside-sandbox read/write? Don't spawn; ask first.",
+        params.sandboxInfo.workspaceDir ? `Sandbox workspace: ${params.sandboxInfo.workspaceDir}` : "",
+        params.sandboxInfo.workspaceAccess
+          ? `Agent workspace access: ${params.sandboxInfo.workspaceAccess}${
+              params.sandboxInfo.agentWorkspaceMount
+                ? ` (mounted at ${params.sandboxInfo.agentWorkspaceMount})`
+                : ""
+            }`
+          : "",
+        params.sandboxInfo.browserBridgeUrl ? "Sandbox browser: enabled." : "",
+        params.sandboxInfo.browserNoVncUrl
+          ? `Sandbox browser observer (noVNC): ${params.sandboxInfo.browserNoVncUrl}`
+          : "",
+        params.sandboxInfo.hostBrowserAllowed === true
+          ? "Host browser control: allowed."
+          : params.sandboxInfo.hostBrowserAllowed === false
+            ? "Host browser control: blocked."
+            : "",
+        params.sandboxInfo.elevated?.allowed
+          ? "Elevated exec is available for this session."
+          : "",
+        params.sandboxInfo.elevated?.allowed
+          ? "User can toggle with /elevated on|off|ask|full."
+          : "",
+        params.sandboxInfo.elevated?.allowed
+          ? "You may also send /elevated on|off|ask|full when needed."
+          : "",
+        params.sandboxInfo.elevated?.allowed
+          ? `Current elevated level: ${params.sandboxInfo.elevated.defaultLevel} (ask runs exec on host with approvals; full auto-approves).`
+          : "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      "",
+    );
+  }
+
+  // Reconstruct Identity & Time
+  lines.push(...buildUserIdentitySection(ownerLine, isMinimal));
+  lines.push(...buildTimeSection({ userTimezone: params.userTimezone }));
+
+  if (params.userTimezone) {
+    lines.push("If you need the current date, time, or day of week, run session_status (📊 session_status).", "");
+  }
+
+  // Reconstruct Runtime Line
+  lines.push(
+    "## Runtime",
+    buildRuntimeLine(
+      params.runtimeInfo,
+      runtimeChannel,
+      runtimeCapabilities,
+      params.defaultThinkLevel,
+    ),
+    "",
+  );
+
+  // Reconstruct Extra Group/Subagent Context
+  if (params.extraSystemPrompt) {
+    const contextHeader =
+      params.promptMode === "minimal" ? "## Subagent Context" : "## Group Chat Context";
+    lines.push(contextHeader, params.extraSystemPrompt, "");
+  }
 
   return lines.filter(Boolean).join("\n");
 }

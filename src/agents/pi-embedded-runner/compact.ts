@@ -59,6 +59,10 @@ import {
   sanitizeSessionHistory,
   sanitizeToolsForGoogle,
 } from "./google.js";
+import {
+  pruneHistoryForContextShare,
+  resolveContextWindowTokens,
+} from "../../compaction.js";
 import { getDmHistoryLimitFromSessionKey, limitHistoryTurns } from "./history.js";
 import { resolveGlobalLane, resolveSessionLane } from "./lanes.js";
 import { log } from "./logger.js";
@@ -103,6 +107,7 @@ export type CompactEmbeddedPiSessionParams = {
   enqueue?: typeof enqueueCommand;
   extraSystemPrompt?: string;
   ownerNumbers?: string[];
+  customTokenLimit?: number;
 };
 
 /**
@@ -431,6 +436,21 @@ export async function compactEmbeddedPiSessionDirect(
         if (limited.length > 0) {
           session.agent.replaceMessages(limited);
         }
+        if (limited.length > 0) {
+          session.agent.replaceMessages(limited);
+        }
+
+        if (params.customTokenLimit) {
+           const pruned = pruneHistoryForContextShare({
+            messages: session.messages,
+            maxContextTokens: resolveContextWindowTokens(model),
+            customTokenLimit: params.customTokenLimit,
+          });
+           if (pruned.droppedMessages > 0) {
+             session.agent.replaceMessages(pruned.messages);
+           }
+        }
+
         const result = await session.compact(params.customInstructions);
         // Estimate tokens after compaction by summing token estimates for remaining messages
         let tokensAfter: number | undefined;

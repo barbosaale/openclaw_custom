@@ -34,3 +34,10 @@ export function isReasoningTagProvider(provider: string | undefined | null): boo
 
   return false;
 }
+
+export function normalizeProviderId(provider: string | undefined | null): string {
+  if (!provider) {
+    return "";
+  }
+  return provider.trim().toLowerCase();
+}
