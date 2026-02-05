@@ -493,6 +493,20 @@ export async function resolveImplicitProviders(params: {
     providers.ollama = { ...(await buildOllamaProvider()), apiKey: ollamaKey };
   }
 
+  // Google Antigravity - inject if env var exists
+  const googleAntigravityKey =
+    process.env.GOOGLE_ANTIGRAVITY_API_KEY ??
+    resolveApiKeyFromProfiles({ provider: "google-antigravity", store: authStore });
+
+  if (googleAntigravityKey) {
+    providers["google-antigravity"] = {
+      baseUrl: "https://generativelanguage.googleapis.com",
+      api: "google-generative-ai",
+      apiKey: googleAntigravityKey,
+      models: [], // Models are typically auto-discovered or specified by user
+    };
+  }
+
   return providers;
 }
 
