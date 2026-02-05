@@ -507,6 +507,20 @@ export async function resolveImplicitProviders(params: {
     };
   }
 
+  // Groq provider
+  const groqKey =
+    resolveEnvApiKeyVarName("groq") ??
+    resolveApiKeyFromProfiles({ provider: "groq", store: authStore });
+
+  if (groqKey) {
+    providers.groq = {
+      baseUrl: "https://api.groq.com/openai/v1",
+      api: "openai-completions",
+      apiKey: groqKey,
+      models: [],
+    };
+  }
+
   return providers;
 }
 
