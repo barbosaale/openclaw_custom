@@ -92,3 +92,27 @@ export function buildMoonshotModelDefinition(): ModelDefinitionConfig {
     maxTokens: MOONSHOT_DEFAULT_MAX_TOKENS,
   };
 }
+
+export const GROQ_BASE_URL = "https://api.groq.com/openai/v1";
+export const GROQ_DEFAULT_MODEL_ID = "llama-3.3-70b-versatile";
+export const GROQ_DEFAULT_MODEL_REF = `groq/${GROQ_DEFAULT_MODEL_ID}`;
+const GROQ_DEFAULT_CONTEXT_WINDOW = 128000;
+const GROQ_DEFAULT_MAX_TOKENS = 8192;
+const GROQ_DEFAULT_COST = {
+  input: 0, // Varies by model
+  output: 0,
+  cacheRead: 0,
+  cacheWrite: 0,
+};
+
+export function buildGroqModelDefinition(): ModelDefinitionConfig {
+  return {
+    id: GROQ_DEFAULT_MODEL_ID,
+    name: "Llama 3.3 70B (Groq)",
+    reasoning: false,
+    input: ["text"],
+    cost: GROQ_DEFAULT_COST,
+    contextWindow: GROQ_DEFAULT_CONTEXT_WINDOW,
+    maxTokens: GROQ_DEFAULT_MAX_TOKENS,
+  };
+}

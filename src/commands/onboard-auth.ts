@@ -73,4 +73,10 @@ export {
   MOONSHOT_BASE_URL,
   MOONSHOT_DEFAULT_MODEL_ID,
   MOONSHOT_DEFAULT_MODEL_REF,
+  GROQ_BASE_URL,
+  GROQ_DEFAULT_MODEL_ID,
+  GROQ_DEFAULT_MODEL_REF,
 } from "./onboard-auth.models.js";
+
+export { applyGroqConfig, applyGroqProviderConfig } from "./onboard-auth.config-groq.js";
+export { setGroqApiKey } from "./onboard-auth.credentials.js";

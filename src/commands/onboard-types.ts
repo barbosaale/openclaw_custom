@@ -24,6 +24,7 @@ export type AuthChoice =
   | "gemini-api-key"
   | "google-antigravity"
   | "google-gemini-cli"
+  | "groq-api-key"
   | "zai-api-key"
   | "xiaomi-api-key"
   | "minimax-cloud"

@@ -22,7 +22,9 @@ export type AuthChoiceGroupId =
   | "minimax"
   | "synthetic"
   | "venice"
-  | "qwen";
+  | "venice"
+  | "qwen"
+  | "groq";
 
 export type AuthChoiceGroup = {
   value: AuthChoiceGroupId;
@@ -78,6 +80,12 @@ const AUTH_CHOICE_GROUP_DEFS: {
     label: "Qwen",
     hint: "OAuth",
     choices: ["qwen-portal"],
+  },
+  {
+    value: "groq",
+    label: "Groq",
+    hint: "API key",
+    choices: ["groq-api-key"],
   },
   {
     value: "zai",
@@ -213,6 +221,7 @@ export function buildAuthChoiceOptions(params: {
     hint: "Claude, GPT, Gemini via opencode.ai/zen",
   });
   options.push({ value: "minimax-api", label: "MiniMax M2.1" });
+  options.push({ value: "groq-api-key", label: "Groq API key" });
   options.push({
     value: "minimax-api-lightning",
     label: "MiniMax M2.1 Lightning",

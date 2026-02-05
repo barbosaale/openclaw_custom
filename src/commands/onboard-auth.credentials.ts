@@ -203,3 +203,15 @@ export async function setOpencodeZenApiKey(key: string, agentDir?: string) {
     agentDir: resolveAuthAgentDir(agentDir),
   });
 }
+
+export async function setGroqApiKey(key: string, agentDir?: string) {
+  upsertAuthProfile({
+    profileId: "groq:default",
+    credential: {
+      type: "api_key",
+      provider: "groq",
+      key,
+    },
+    agentDir: resolveAuthAgentDir(agentDir),
+  });
+}
